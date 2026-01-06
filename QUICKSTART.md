@@ -6,6 +6,8 @@
 npm install
 ```
 
+**Note**: The project uses Apollo Server v5, React 18, Next.js 14, and includes virtualization libraries for optimal performance.
+
 ## 2. Start Development Server
 
 ```bash
@@ -13,6 +15,8 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000)
+
+**Auto-Scraping**: On server start, the application automatically checks for active brands and starts scraping if no products exist. This happens in development mode by default, or if `AUTO_SCRAPE=true` is set in production.
 
 ## 3. View Available Brands
 
@@ -67,6 +71,8 @@ The scraper will:
 - Log progress to the console
 
 **Note:** Products are automatically saved to the in-memory product store when scraping completes. Check the server console for scraping progress.
+
+**Auto-Scraping**: The application automatically starts scraping for brands that have no products when the server starts (in development mode or if `AUTO_SCRAPE=true`).
 
 ## 5. Add More Brands
 
@@ -193,6 +199,17 @@ query {
 ```
 
 **Note:** Products are stored in memory and will persist until the server restarts. To enable database persistence, see the Database Setup section below.
+
+### Dashboard Features
+
+The dashboard includes:
+
+- **Infinite Scroll**: Automatically loads more products as you scroll down
+- **Virtualized Grid**: Optimized rendering for large product lists (lazy loading after 50 items)
+- **Back to Top Button**: Appears when you scroll down 300px
+- **Product Accumulation**: "Load More" appends products instead of replacing them
+- **Scroll Position Preservation**: Maintains your scroll position when new items load
+- **Loading Indicators**: Shows "Loading more products..." at the bottom when fetching
 
 ## 8. Understanding the Store System
 

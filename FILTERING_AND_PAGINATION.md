@@ -119,19 +119,23 @@ Return: products for current page + totalCount
 - Slice = products[50..100]
 - Returns: 50 products (items 51-100)
 
-### "Load More" Button
+### "Load More" and Infinite Scroll
 
-**Location**: `app/page.tsx` (line 197-204)
+**Location**: `app/page.tsx` and `components/VirtualizedProductGrid.tsx`
 
-```typescript
-{productsData?.products?.hasMore && (
-  <button
-    onClick={() => setFilters({ ...filters, page: filters.page + 1 })}
-  >
-    Load More
-  </button>
-)}
-```
+**Two Ways to Load More**:
+
+1. **Manual "Load More" Button** (top of product list):
+   ```typescript
+   <button onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>
+     Load More ({remaining} remaining)
+   </button>
+   ```
+
+2. **Automatic Infinite Scroll** (scroll to bottom):
+   - Uses `react-intersection-observer` to detect when user scrolls near bottom
+   - Triggers automatically when bottom element comes into view (300px margin)
+   - Shows "Loading more products..." indicator while fetching
 
 **How it works**:
 
@@ -139,10 +143,10 @@ Return: products for current page + totalCount
    ```typescript
    hasMore: (page - 1) * pageSize + products.length < totalCount
    ```
-   - Example: Page 1, showing 50 of 500 → `hasMore = true`
-   - Example: Page 10, showing 500 of 500 → `hasMore = false`
+   - Example: Showing 50 of 500 → `hasMore = true`
+   - Example: Showing 500 of 500 → `hasMore = false`
 
-2. **On Click**: Increments the page number
+2. **On Trigger** (button click or scroll): Increments the page number
    ```typescript
    setFilters({ ...filters, page: filters.page + 1 })
    ```
@@ -154,50 +158,45 @@ Return: products for current page + totalCount
    });
    ```
 
-4. **New Products Loaded**: The query returns the next page of products
+4. **Products Appended**: New products are appended to `allLoadedProducts` state
+   ```typescript
+   setAllLoadedProducts(prev => [...prev, ...newProducts]);
+   ```
+
+5. **Scroll Preserved**: `useLayoutEffect` restores scroll position after DOM update
 
 ## Important Notes
 
-### ⚠️ Current Limitation: "Load More" Replaces, Doesn't Append
+### ✅ "Load More" Appends Products
 
-**Current Behavior**: When you click "Load More", it shows the NEXT page (replaces current products)
+**Current Behavior**: "Load More" and infinite scroll **append** new products to the existing list
 
-**Expected Behavior**: "Load More" should APPEND new products to the existing list
+**Implementation**:
 
-### Current Implementation Issue
-
-Looking at the code:
-- `products` state is derived from `productsData.products.products`
-- When page changes, it shows ONLY that page's products
-- Previous products are not kept
-
-### How to Fix "Load More" to Append
-
-You would need to:
-
-1. **Accumulate products** instead of replacing:
+1. **Product Accumulation** (`app/page.tsx`):
    ```typescript
    const [allLoadedProducts, setAllLoadedProducts] = useState<Product[]>([]);
    
    useEffect(() => {
-     if (productsData?.products?.products) {
+     if (currentPageProducts.length > 0) {
        if (filters.page === 1) {
          // First page: replace
-         setAllLoadedProducts(productsData.products.products);
+         setAllLoadedProducts(currentPageProducts);
        } else {
-         // Subsequent pages: append
-         setAllLoadedProducts(prev => [...prev, ...productsData.products.products]);
+         // Subsequent pages: append (avoid duplicates)
+         setAllLoadedProducts(prev => {
+           const existingIds = new Set(prev.map(p => p.id));
+           const newProducts = currentPageProducts.filter(p => !existingIds.has(p.id));
+           return [...prev, ...newProducts];
+         });
        }
      }
-   }, [productsData, filters.page]);
+   }, [currentPageProducts, filters.page]);
    ```
 
-2. **Display accumulated products**:
-   ```typescript
-   {allLoadedProducts.map((product) => (
-     <ProductCard key={product.id} ... />
-   ))}
-   ```
+2. **Scroll Position Preservation**: Uses `useLayoutEffect` to maintain scroll position when new items are appended
+
+3. **Display**: Shows all accumulated products in the `VirtualizedProductGrid`
 
 ## Filter Interaction
 
@@ -259,11 +258,55 @@ This ensures you always start from page 1 when filtering.
 └─────────────────┘
 ```
 
+## Virtualized Grid and Lazy Loading
+
+### VirtualizedProductGrid Component
+
+**Location**: `components/VirtualizedProductGrid.tsx`
+
+**Features**:
+- **Lazy Loading**: Items after index 50 use intersection observer
+- **Placeholders**: Shows skeleton loaders for items not in viewport
+- **Smooth Animations**: Staggered fade-in animations for items entering view
+- **Performance**: Only renders visible items + buffer for optimal performance
+
+**How it works**:
+1. First 50 items render immediately (no lazy loading)
+2. Items 50+ use `useInView` hook to detect when entering viewport
+3. Placeholder skeleton shown until item is in view
+4. Smooth fade-in animation when item becomes visible
+
+## Scroll Position Preservation
+
+**Implementation**: `app/page.tsx`
+
+When loading more products:
+1. **Save scroll position** before state update:
+   ```typescript
+   scrollPositionRef.current = { y: window.scrollY, height: document.documentElement.scrollHeight };
+   ```
+
+2. **Append new products** to state
+
+3. **Restore scroll position** using `useLayoutEffect`:
+   ```typescript
+   useLayoutEffect(() => {
+     if (scrollPositionRef.current && !isLoadingMore) {
+       window.scrollTo({ top: scrollPositionRef.current.y, behavior: 'auto' });
+     }
+   }, [allLoadedProducts, isLoadingMore]);
+   ```
+
+This ensures users stay at their scroll position when new items are loaded.
+
 ## Summary
 
 - **Scraping**: Collects ALL products (no filtering)
 - **Filtering**: Happens in-memory on ALL scraped products
 - **Pagination**: Slices the filtered results into pages
-- **Load More**: Currently shows next page (replaces), should append
+- **Load More**: Appends new products to existing list (doesn't replace)
+- **Infinite Scroll**: Automatically loads more when scrolling to bottom
+- **Scroll Preservation**: Maintains scroll position when new items load
+- **Virtualization**: Lazy loads items after 50 for better performance
 - **Filter Reset**: Changing filters resets to page 1
 

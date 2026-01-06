@@ -2,14 +2,30 @@
 
 ## Backend Structure
 
-### Database (Prisma ORM)
+### In-Memory Stores (Default)
+The application uses **in-memory stores** by default for fast development and testing:
+
+- **Brand Store** (`lib/brandStore.ts`): Manages brands in memory
+- **Product Store** (`lib/productStore.ts`): Manages scraped products in memory
+- **Auto-Initialization**: Morellato brand is automatically added on server start
+- **Auto-Scraping**: Automatically starts scraping for brands with no products (development mode)
+
+### Database (Prisma ORM) - Optional
+Database support is available but commented out by default:
+
 - **Brand**: Stores brand information and configuration
 - **Product**: Stores product data with relationships to brands
 - **ScraperJob**: Tracks scraping jobs with progress and status
 
+To enable database, uncomment the Prisma code in:
+- `prisma/schema.prisma`
+- `lib/prisma.ts`
+- `graphql/resolvers.ts`
+- `services/scraperService.ts`
+
 ### GraphQL API
-- **Apollo Server**: Handles all GraphQL queries and mutations
-- **Resolvers**: Business logic for fetching and manipulating data
+- **Apollo Server v5**: Handles all GraphQL queries and mutations
+- **Resolvers**: Business logic for fetching and manipulating data (uses in-memory stores)
 - **Schema**: Type definitions for all entities
 
 ### Scraping System
@@ -17,13 +33,32 @@
 - **Brand-Specific Scrapers**: Custom scrapers registered per brand
 - **Scraper Service**: Manages scraping jobs and progress tracking
 
-## Key Features
+## Frontend Features
+
+### 1. Virtualized Product Grid
+- **Lazy Loading**: Items after index 50 use intersection observer for lazy loading
+- **Performance**: Only renders visible items + buffer for smooth scrolling
+- **Placeholders**: Shows skeleton loaders for items not yet in viewport
+- **Staggered Animations**: Smooth fade-in animations for items entering viewport
+
+### 2. Infinite Scroll
+- **Auto-Load**: Automatically loads more products when scrolling near bottom (300px threshold)
+- **Scroll Preservation**: Maintains scroll position when new items are appended
+- **Loading Indicator**: Shows "Loading more products..." at the bottom during fetch
+- **Product Accumulation**: New products are appended to existing list (not replaced)
+
+### 3. Back to Top Button
+- **Auto-Show**: Appears when user scrolls down 300px
+- **Smooth Scroll**: Smoothly scrolls to top when clicked
+- **Fixed Position**: Always accessible in bottom-right corner
+
+## Backend Features
 
 ### 1. Pagination Support
 The scraper handles different pagination types:
 - URL parameters (`?page=1`)
 - URL paths (`/page/1`)
-- Selector-based (extract from page)
+- Custom URL builders (e.g., Morellato's `_2`, `_3` pattern)
 
 ### 2. Promise Chaining
 Products from multiple pages are scraped concurrently using `Promise.all()` for better performance.
@@ -46,9 +81,16 @@ registerBrandScraper('BrandName', {
 });
 ```
 
+### 5. Auto-Scraping
+The application automatically starts scraping on server start:
+- **Development Mode**: Auto-scrapes by default
+- **Production Mode**: Requires `AUTO_SCRAPE=true` environment variable
+- **Smart Detection**: Only scrapes brands that have no products
+- **Non-Blocking**: Scraping runs asynchronously without blocking server startup
+
 ## Adding a New Brand
 
-1. **Create Brand in Database** (via GraphQL or Prisma):
+1. **Create Brand** (via GraphQL or in-memory store):
 ```graphql
 mutation {
   createBrand(input: {
@@ -168,11 +210,21 @@ ProductDash/
 │   ├── advancedScraper.ts # Main scraping logic
 │   └── morellatoScraper.ts # Brand-specific example
 ├── lib/
-│   ├── prisma.ts          # Prisma client
+│   ├── brandStore.ts      # In-memory brand store
+│   ├── productStore.ts    # In-memory product store
+│   ├── autoScraper.ts    # Auto-scraping on server start
+│   ├── prisma.ts          # Prisma client (commented out)
 │   └── apollo-client.ts   # Apollo Client setup
+├── components/
+│   ├── VirtualizedProductGrid.tsx # Virtualized grid with lazy loading
+│   ├── BackToTopButton.tsx       # Back to top functionality
+│   ├── ProductCard.tsx            # Individual product card
+│   ├── SearchBar.tsx              # Search input
+│   ├── FilterBar.tsx              # Brand/type filters
+│   └── ExportButton.tsx          # CSV export
 └── app/
     ├── api/
-    │   └── graphql/        # GraphQL API endpoint
-    └── page.tsx            # Dashboard (uses GraphQL)
+    │   └── graphql/        # GraphQL API endpoint (Apollo Server v5)
+    └── page.tsx            # Dashboard with infinite scroll
 ```
 
