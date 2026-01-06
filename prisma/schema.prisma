@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // or "sqlite" for development
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  website     String
+  baseUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  products    Product[]
+  scraperJobs ScraperJob[]
+  
+  @@map("brands")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  type        String?
+  price       String?
+  imageUrl    String
+  description String?  @db.Text
+  url         String
+  metadata    Json?    // Flexible JSON field for additional product data
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([brandId, url]) // Ensure unique products per brand
+  @@index([brandId])
+  @@index([name])
+  @@index([type])
+  @@map("products")
+}
+
+model ScraperJob {
+  id          String   @id @default(cuid())
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  status      String   @default("pending") // pending, running, completed, failed
+  totalPages  Int?
+  currentPage Int      @default(0)
+  productsFound Int    @default(0)
+  error       String?  @db.Text
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([brandId])
+  @@index([status])
+  @@map("scraper_jobs")
+}
+
