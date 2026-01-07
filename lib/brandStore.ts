@@ -22,6 +22,15 @@ class BrandStore {
       baseUrl: 'https://www.morellato.com',
       isActive: true,
     });
+
+     // Add more brands here
+  this.addBrand({
+    name: 'S\'Agapõ',
+    website: 'https://www.sagapo.it/donna',
+    baseUrl: 'https://www.sagapo.it/',
+    isActive: true,
+  });
+
   }
 
   addBrand(brandData: Omit<Brand, 'id' | 'createdAt' | 'updatedAt'>): Brand {
