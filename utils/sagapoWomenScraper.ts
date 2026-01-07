@@ -5,69 +5,65 @@ import { ScraperConfig, registerBrandScraper } from './advancedScraper';
 import * as cheerio from 'cheerio';
 import { Product } from '@/types/product';
 
-// Morellato URL pagination pattern:
+// Sagapo URL pagination pattern:
 // Page 1: donna
 // Page 2: donna?p=2
 // Page 3: donna?p=3
 // etc.
 
-const morellatoUrlBuilder = (baseUrl: string, page: number): string => {
-  // Extract the base URL without the .htm extension
+const sagapoWomenUrlBuilder = (baseUrl: string, page: number): string => {
+  // Extract the base URL
   const urlObj = new URL(baseUrl);
   let pathname = urlObj.pathname;
   
   // Remove existing page number if present (e.g., _2)
-  pathname = pathname.replace(/_\d+\.htm$/, '.htm');
-  
+  pathname = pathname.replace(/\?p=\d+\$/, '#');
   // For page 1, use the base URL as-is
   if (page === 1) {
     return `${urlObj.origin}${pathname}`;
   }
   
   // For page 2+, insert _pageNumber before .htm
-  pathname = pathname.replace(/\.htm$/, `_${page}.htm`);
+  pathname = pathname.replace(/\d+\$/, `${page}`);
   return `${urlObj.origin}${pathname}`;
 };
 
-// Morellato-specific scraper configuration
-export const morellatoScraperConfig: ScraperConfig = {
+// Sagapo-specific scraper configuration
+export const sagapoWomenScraperConfig: ScraperConfig = {
   pagination: {
     type: 'custom',
-    customUrlBuilder: morellatoUrlBuilder,
+    customUrlBuilder: sagapoWomenUrlBuilder,
     startPage: 1,
   },
   // Product list selector - based on the HTML structure
   // Products appear to be in a grid/list format
   // Try multiple selectors to catch all products
-  productListSelector: 'article, .product-item, [class*="product"], [data-product], .item, [class*="item"], li[class*="product"], div[class*="product"]',
+  productListSelector: '.product-item , [class*="product"], [data-product], .item, [class*="item"], li[class*="product"], div[class*="product"]',
   selectors: {
-    name: '.product-item-name, [class*="name"], a[href*="/"]',
-    imageUrl: 'img',
+    name: '.product-item-name, [class*="name"], a[class*="product-item-link"]',
+    imageUrl: '.price, [class*="price"], [data-price]',
     price: '.price, [class*="price"], [data-price]',
-    description: '.description, [class*="desc"]',
-    url: 'a',
-    type: '.category, [class*="category"]',
+    description: '.product sku product-item-sku, [class*="sku"]',
+    url: '.product-item-link',
   },
   baseUrl: 'https://www.sagapo.it/donna',
   
   // Custom extraction function for S'agapo-specific structure
   extractProduct: ($: cheerio.CheerioAPI, element: any) => {
     const $el = $(element);
-    
-    // Find product name - in this instance it is a strong tag
-    let name = $el.find('product-item-name').first().text().trim();
+    console.log('hi i found elements element', element);
+    // Find product name - in this instance it is a specific class
+    let name = $el.find('.product-item-name').first().text().trim();
     if (!name) {
       // Try to get from link text
       name = $el.find('a[href*="/"]').first().text().trim();
     }
-    // Remove "Acquista Ora" or similar buttons text
-    name = name.replace(/Acquista Ora/gi, '').trim();
     
     // Find image - be very aggressive in finding images
     let imageUrl = '';
     
     // Strategy 1: Find all img tags in the element and try each one
-    const $allImages = $el.find('img');
+    const $allImages = $el.find('[class*="product-image-photo"]');
     if ($allImages.length > 0) {
       // Try each image in order
       $allImages.each((_, img) => {
@@ -172,9 +168,9 @@ export const morellatoScraperConfig: ScraperConfig = {
         if (imageUrl.startsWith('//')) {
           imageUrl = 'https:' + imageUrl;
         } else if (imageUrl.startsWith('/')) {
-          imageUrl = `https://www.morellato.com${imageUrl}`;
+          imageUrl = `https://www.sagapo.it/${imageUrl}`;
         } else {
-          imageUrl = `https://www.morellato.com/${imageUrl}`;
+          imageUrl = `https://www.sagapo.it/${imageUrl}`;
         }
       }
       
@@ -189,10 +185,10 @@ export const morellatoScraperConfig: ScraperConfig = {
     
     // Debug logging for missing images
     if (!imageUrl && name) {
-      console.warn(`[Morellato Scraper] ⚠️ No image found for product: "${name.substring(0, 50)}"`);
+      console.warn(`[Sagapo Scraper] ⚠️ No image found for product: "${name.substring(0, 50)}"`);
       // Log the HTML structure for debugging
       const htmlSnippet = $el.html()?.substring(0, 200);
-      console.warn(`[Morellato Scraper] HTML snippet:`, htmlSnippet);
+      console.warn(`[Sagapo Scraper] HTML snippet:`, htmlSnippet);
     }
     
     // If still no image, try to find it in parent elements
@@ -211,12 +207,12 @@ export const morellatoScraperConfig: ScraperConfig = {
               if (imageUrl.startsWith('//')) {
                 imageUrl = 'https:' + imageUrl;
               } else if (imageUrl.startsWith('/')) {
-                imageUrl = `https://www.morellato.com${imageUrl}`;
+                imageUrl = `https://www.sagapo.it${imageUrl}`;
               } else {
-                imageUrl = `https://www.morellato.com/${imageUrl}`;
+                imageUrl = `https://www.sagapo.it/${imageUrl}`;
               }
             }
-            console.log(`[Morellato Scraper] ✅ Found image in parent for: ${name.substring(0, 50)}`);
+            console.log(`[Sagapo Scraper] ✅ Found image in parent for: ${name.substring(0, 50)}`);
             break;
           }
         }
@@ -239,11 +235,11 @@ export const morellatoScraperConfig: ScraperConfig = {
     // Find product URL
     let productUrl = $el.find('a[href*="/"]').first().attr('href') || '';
     if (productUrl && !productUrl.startsWith('http')) {
-      productUrl = `https://www.morellato.com${productUrl.startsWith('/') ? productUrl : '/' + productUrl}`;
+      productUrl = `https://www.sagapo.it${productUrl.startsWith('/') ? productUrl : '/' + productUrl}`;
     }
     
     // Extract description if available
-    const description = $el.find('.description, [class*="desc"]').first().text().trim();
+    const description = $el.find('.product-item-link, [class*="name"]').first().text().trim();
     
     // Try to determine product type from name or categories
     let type = 'Jewelry'; // Default
@@ -260,11 +256,11 @@ export const morellatoScraperConfig: ScraperConfig = {
       imageUrl: imageUrl || '',
       price: price || undefined,
       description: description || undefined,
-      url: productUrl || 'https://www.morellato.com',
+      url: productUrl || 'https://www.sagapo.it',
       type,
     };
   },
 };
 
 // Register the scraper
-registerBrandScraper('Morellato', morellatoScraperConfig);
+registerBrandScraper('Sagapo', sagapoWomenScraperConfig);

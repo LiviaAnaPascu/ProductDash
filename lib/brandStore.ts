@@ -27,7 +27,7 @@ class BrandStore {
   this.addBrand({
     name: 'S\'Agapõ',
     website: 'https://www.sagapo.it/donna',
-    baseUrl: 'https://www.sagapo.it/',
+    baseUrl: 'https://www.sagapo.it/donna',
     isActive: true,
   });
 
