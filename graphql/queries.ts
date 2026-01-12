@@ -11,11 +11,42 @@ export const GET_PRODUCTS = gql`
           name
         }
         type
+        gender
         price
         imageUrl
         description
         url
         metadata
+        details {
+          sku
+          barcode
+          urlHandle
+          detailedDescription
+          compareAtPrice
+          costPerItem
+          chargeTax
+          taxCode
+          unitPriceTotalMeasure
+          unitPriceTotalMeasureUnit
+          unitPriceBaseMeasure
+          unitPriceBaseMeasureUnit
+          inventoryQuantity
+          continueSellingWhenOutOfStock
+          weightValue
+          weightUnit
+          requiresShipping
+          fulfillmentService
+          additionalImages
+          tags
+          seoTitle
+          seoDescription
+          googleProductCategory
+          googleGender
+          googleAgeGroup
+          googleMPN
+          googleCondition
+          productCategory
+        }
       }
       totalCount
       page

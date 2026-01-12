@@ -95,10 +95,36 @@ export async function POST(request: NextRequest) {
   try {
     await startServer();
     
-    const body = await request.json();
+    // Get raw body text for debugging
+    const rawBody = await request.text();
+    let body: any;
+    
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseError: any) {
+      console.error('[GraphQL] Failed to parse request body:', parseError);
+      console.error('[GraphQL] Raw body:', rawBody.substring(0, 500));
+      return new Response(
+        JSON.stringify({ 
+          errors: [{ 
+            message: 'Invalid JSON in request body',
+            ...(process.env.NODE_ENV === 'development' && { 
+              details: parseError.message,
+              rawBody: rawBody.substring(0, 200)
+            })
+          }] 
+        }),
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
     const { query, variables, operationName } = body;
     
     if (!query) {
+      console.error('[GraphQL] Missing query in request body');
       return new Response(
         JSON.stringify({ errors: [{ message: 'Query is required' }] }),
         { 
@@ -143,41 +169,64 @@ export async function POST(request: NextRequest) {
       headerMap.set(key, value);
     });
     
-    const httpResponse = await server.executeHTTPGraphQLRequest({
-      httpGraphQLRequest: {
-        method: 'POST',
-        headers: headerMap,
-        search: '',
-        body: { 
-          query, 
-          ...(parsedVariables !== undefined && { variables: parsedVariables }),
-          ...(operationName && { operationName }),
+    try {
+      const httpResponse = await server.executeHTTPGraphQLRequest({
+        httpGraphQLRequest: {
+          method: 'POST',
+          headers: headerMap,
+          search: '',
+          body: { 
+            query, 
+            ...(parsedVariables !== undefined && { variables: parsedVariables }),
+            ...(operationName && { operationName }),
+          },
         },
-      },
-      context: async () => ({}),
-    });
-    
-    if (httpResponse.body.kind === 'complete') {
-      return new Response(httpResponse.body.string, {
-        status: httpResponse.status || 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...Object.fromEntries(httpResponse.headers),
-        },
+        context: async () => ({}),
       });
-    } else {
-      // Handle chunked response (shouldn't happen in this case)
-      const chunks: string[] = [];
-      for await (const chunk of httpResponse.body.asyncIterator) {
-        chunks.push(chunk);
+      
+      let responseBody: string;
+      if (httpResponse.body.kind === 'complete') {
+        responseBody = httpResponse.body.string;
+      } else {
+        // Handle chunked response (shouldn't happen in this case)
+        const chunks: string[] = [];
+        for await (const chunk of httpResponse.body.asyncIterator) {
+          chunks.push(chunk);
+        }
+        responseBody = chunks.join('');
       }
-      return new Response(chunks.join(''), {
+      
+      // Log response status for debugging
+      if (httpResponse.status && httpResponse.status >= 400) {
+        console.error('[GraphQL] Apollo Server returned error status:', httpResponse.status);
+        console.error('[GraphQL] Response body:', responseBody.substring(0, 500));
+      }
+      
+      return new Response(responseBody, {
         status: httpResponse.status || 200,
         headers: {
           'Content-Type': 'application/json',
           ...Object.fromEntries(httpResponse.headers),
         },
       });
+    } catch (apolloError: any) {
+      console.error('[GraphQL] Apollo Server execution error:', apolloError);
+      console.error('[GraphQL] Error stack:', apolloError.stack);
+      return new Response(
+        JSON.stringify({ 
+          errors: [{ 
+            message: apolloError.message || 'GraphQL execution error',
+            ...(process.env.NODE_ENV === 'development' && { 
+              stack: apolloError.stack,
+              details: apolloError.toString()
+            })
+          }] 
+        }),
+        { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     }
   } catch (error: any) {
     console.error('POST request error:', error);

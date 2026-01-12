@@ -81,7 +81,6 @@ export default function ProductCard({ product, isSelected, onToggleSelect }: Pro
                 setImageLoading(false);
               }}
               onLoad={() => setImageLoading(false)}
-              onLoadingComplete={() => setImageLoading(false)}
             />
           </>
         )}

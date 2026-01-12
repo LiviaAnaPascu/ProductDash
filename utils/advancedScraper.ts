@@ -34,7 +34,21 @@ export interface ScraperConfig {
   productUrlPrefix?: string; // If product URLs are relative
   
   // Custom extraction function (optional)
-  extractProduct?: ($: cheerio.CheerioAPI, element: any) => Partial<Product>;
+  // Return null or undefined to skip the product
+  extractProduct?: ($: cheerio.CheerioAPI, element: any) => Partial<Product> | null | undefined;
+  
+  // Optional filter function to skip products based on extracted data
+  // Return false to skip the product, true to include it
+  shouldIncludeProduct?: (product: Partial<Product>) => boolean;
+  
+  // Second layer: Extract detailed metadata from individual product page
+  // This function will be called for each product's detail page URL
+  // Return null/undefined if details couldn't be extracted
+  extractProductDetails?: (
+    $: cheerio.CheerioAPI,
+    productUrl: string,
+    baseProduct: Product
+  ) => Partial<Product['details']> | null | undefined;
 }
 
 // Generic pagination handler
@@ -81,11 +95,16 @@ function extractProductsFromPage(
   $(config.productListSelector).each((index, element) => {
     try {
       const $el = $(element);
-      let product: Partial<Product> = {};
+      let product: Partial<Product> | null = null;
       
       // Use custom extractor if provided
       if (config.extractProduct) {
-        product = config.extractProduct($, element) || {};
+        const extracted = config.extractProduct($, element);
+        // Skip product if extractor returns null/undefined
+        if (!extracted) {
+          return; // Skip this iteration
+        }
+        product = extracted;
       } else {
         // Default extraction using selectors
         const name = $el.find(config.selectors.name).first().text().trim();
@@ -129,6 +148,16 @@ function extractProductsFromPage(
         };
       }
       
+      // Skip if no product was extracted
+      if (!product) {
+        return; // Skip this iteration
+      }
+      
+      // Apply filter function if provided
+      if (config.shouldIncludeProduct && !config.shouldIncludeProduct(product)) {
+        return; // Skip this product
+      }
+      
       // Allow products without images (they'll show placeholder)
       if (product.name) {
         products.push({
@@ -136,6 +165,7 @@ function extractProductsFromPage(
           name: product.name!,
           brand: brand.name,
           type: product.type || 'General',
+          gender: product.gender || 'female',
           price: product.price,
           imageUrl: product.imageUrl || '', // Allow empty string for placeholder
           description: product.description,
@@ -178,7 +208,8 @@ async function getTotalPages(html: string, config: ScraperConfig): Promise<numbe
     '[class*="pagination"] a',
     '.pager a',
     '[class*="pager"] a',
-    'a[href*="catalogo-prodotti"]', // Morellato specific
+    'a[href*="donna-G2"]', // Morellato specific (new pattern)
+    'a[href*="catalogo-prodotti-A1"]', // Morellato specific (old pattern)
   ];
   
   let maxPage = 1;
@@ -188,8 +219,11 @@ async function getTotalPages(html: string, config: ScraperConfig): Promise<numbe
       const href = $link.attr('href') || '';
       const text = $link.text().trim();
       
-      // Extract page number from URL (e.g., catalogo-prodotti-A1_12.htm)
-      const urlMatch = href.match(/catalogo-prodotti-A1_(\d+)\.htm/);
+      // Extract page number from URL patterns:
+      // - donna-G2_12.htm (new pattern)
+      // - catalogo-prodotti-A1_12.htm (old pattern)
+      // - Any pattern with _N.htm where N is a number
+      const urlMatch = href.match(/_(\d+)\.htm/);
       if (urlMatch && urlMatch[1]) {
         const pageNum = parseInt(urlMatch[1]);
         if (pageNum > maxPage) maxPage = pageNum;
@@ -289,6 +323,19 @@ export async function scrapeBrandProducts(
       });
     }
     
+    // Note: Second layer (detail scraping) is now separate and must be triggered manually
+    // via scrapeProductDetails function
+    
+    if (progressCallback) {
+      await progressCallback({
+        jobId: '',
+        currentPage: totalPages,
+        totalPages: totalPages,
+        productsFound: allProducts.length,
+        status: 'completed',
+      });
+    }
+    
     return allProducts;
   } catch (error: any) {
     if (progressCallback) {
@@ -305,9 +352,92 @@ export async function scrapeBrandProducts(
   }
 }
 
+// Separate function to scrape product details for selected products
+// This runs asynchronously and doesn't block the main scraping flow
+export async function scrapeProductDetails(
+  products: Product[],
+  config: ScraperConfig,
+  progressCallback?: (progress: { current: number; total: number; productName: string }) => void
+): Promise<Product[]> {
+  if (!config.extractProductDetails) {
+    console.warn('[Scraper] No extractProductDetails function configured, skipping detail scraping');
+    return products;
+  }
+  
+  if (products.length === 0) {
+    return products;
+  }
+  
+  console.log(`[Scraper] Starting detail scraping for ${products.length} products`);
+  
+  const updatedProducts: Product[] = [];
+  const batchSize = 5; // Number of concurrent detail requests
+  
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = products.slice(i, i + batchSize);
+    
+    // Scrape details for this batch concurrently
+    const detailPromises = batch.map(async (product) => {
+      try {
+        if (!product.url) {
+          console.warn(`[Scraper] Product "${product.name}" has no URL, skipping detail scraping`);
+          return product;
+        }
+        
+        if (progressCallback) {
+          progressCallback({
+            current: i + batch.indexOf(product) + 1,
+            total: products.length,
+            productName: product.name,
+          });
+        }
+        
+        // Fetch product detail page
+        const detailHtml = await fetch(product.url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        }).then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch: ${res.statusText}`);
+          }
+          return res.text();
+        });
+        
+        const $ = cheerio.load(detailHtml);
+        const details = config.extractProductDetails!($, product.url, product);
+        
+        if (details) {
+          product.details = details;
+          console.log(`[Scraper] ✅ Extracted details for: ${product.name}`);
+        } else {
+          console.warn(`[Scraper] ⚠️ No details extracted for: ${product.name}`);
+        }
+        
+        return product;
+      } catch (error: any) {
+        console.error(`[Scraper] ❌ Error scraping details for "${product.name}":`, error.message);
+        return product; // Return product without details
+      }
+    });
+    
+    // Wait for batch to complete
+    const batchResults = await Promise.all(detailPromises);
+    updatedProducts.push(...batchResults);
+    
+    // Small delay between batches to be respectful
+    if (i + batchSize < products.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+    }
+  }
+  
+  console.log(`[Scraper] ✅ Detail scraping completed for ${updatedProducts.length} products`);
+  return updatedProducts;
+}
+
 // Get scraper configuration for a brand
 // This should be customized per brand
-function getScraperConfig(brand: Brand): ScraperConfig {
+export function getScraperConfig(brand: Brand): ScraperConfig {
   // Check if there's a registered scraper for this brand
   const customConfig = brandScrapers.get(brand.name);
   if (customConfig) {

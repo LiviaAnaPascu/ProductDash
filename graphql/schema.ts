@@ -6,13 +6,46 @@ export const typeDefs = gql`
     name: String!
     brand: Brand!
     type: String
+    gender: String
     price: String
     imageUrl: String!
     description: String
     url: String!
     metadata: JSON
+    details: ProductDetails
     createdAt: String!
     updatedAt: String!
+  }
+
+  type ProductDetails {
+    sku: String
+    barcode: String
+    urlHandle: String
+    detailedDescription: String
+    compareAtPrice: String
+    costPerItem: String
+    chargeTax: Boolean
+    taxCode: String
+    unitPriceTotalMeasure: String
+    unitPriceTotalMeasureUnit: String
+    unitPriceBaseMeasure: String
+    unitPriceBaseMeasureUnit: String
+    inventoryQuantity: Int
+    continueSellingWhenOutOfStock: Boolean
+    weightValue: Int
+    weightUnit: String
+    requiresShipping: Boolean
+    fulfillmentService: String
+    additionalImages: [String!]
+    tags: [String!]
+    seoTitle: String
+    seoDescription: String
+    googleProductCategory: String
+    googleGender: String
+    googleAgeGroup: String
+    googleMPN: String
+    googleCondition: String
+    productCategory: String
   }
 
   type Brand {
@@ -52,6 +85,7 @@ export const typeDefs = gql`
     search: String
     brandId: ID
     type: String
+    gender: String
     page: Int
     pageSize: Int
   }
@@ -64,6 +98,15 @@ export const typeDefs = gql`
 
   input StartScrapingInput {
     brandId: ID!
+  }
+
+  input ScrapeProductDetailsInput {
+    productIds: [ID!]!
+  }
+
+  type ScrapeProductDetailsResult {
+    success: Int!
+    failed: Int!
   }
 
   type Query {
@@ -94,6 +137,7 @@ export const typeDefs = gql`
     deleteBrand(id: ID!): Boolean!
     startScraping(input: StartScrapingInput!): ScraperJob!
     cancelScraping(jobId: ID!): Boolean!
+    scrapeProductDetails(input: ScrapeProductDetailsInput!): ScrapeProductDetailsResult!
   }
 
   type Subscription {

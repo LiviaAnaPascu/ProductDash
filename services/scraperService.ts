@@ -1,9 +1,10 @@
 // Database imports commented out
 // import { Brand } from '@prisma/client';
 // import { prisma } from '@/lib/prisma';
-import { scrapeBrandProducts } from '@/utils/advancedScraper';
+import { scrapeBrandProducts, scrapeProductDetails, getScraperConfig } from '@/utils/advancedScraper';
 import { Brand } from '@/lib/brandStore';
-import { productStore } from '@/lib/productStore';
+import { productStore, StoredProduct } from '@/lib/productStore';
+import { Product } from '@/types/product';
 
 export interface ScrapingProgress {
   jobId: string;
@@ -86,3 +87,64 @@ export const startScrapingJob = async (jobId: string, brand: Brand) => {
   }
 };
 
+// Scrape details for selected products (runs asynchronously)
+export const scrapeSelectedProductDetails = async (
+  productIds: string[],
+  progressCallback?: (progress: { current: number; total: number; productName: string }) => void
+): Promise<{ success: number; failed: number }> => {
+  try {
+    console.log(`[Detail Scraper] Starting detail scraping for ${productIds.length} products`);
+    
+    // Get products from store
+    const products = productIds
+      .map(id => productStore.getProduct(id))
+      .filter((p): p is StoredProduct => p !== undefined) as StoredProduct[];
+    
+    if (products.length === 0) {
+      console.warn('[Detail Scraper] No products found for detail scraping');
+      return { success: 0, failed: 0 };
+    }
+    
+    // Get brand for scraper config
+    const brandId = products[0].brandId;
+    // We need to get the brand - for now, we'll get it from the first product
+    // In a real scenario, you'd get the brand from brandStore
+    // For now, we'll use a workaround
+    
+    // Get scraper config (we need brand name, but we only have brandId)
+    // We'll need to pass brand or get it differently
+    // For now, let's get products by brand and use the first product's brand
+    const allBrandProducts = productStore.getProductsByBrand(brandId);
+    if (allBrandProducts.length === 0) {
+      throw new Error('Brand not found');
+    }
+    
+    // We need the brand object - let's import brandStore
+    const { brandStore } = await import('@/lib/brandStore');
+    const brand = brandStore.getBrand(brandId);
+    if (!brand) {
+      throw new Error('Brand not found');
+    }
+    
+    const config = getScraperConfig(brand);
+    
+    // Scrape details
+    const updatedProducts = await scrapeProductDetails(products, config, progressCallback);
+    
+    // Update products in store
+    const updates = new Map<string, Partial<Product>>();
+    for (const product of updatedProducts) {
+      updates.set(product.id, { details: product.details });
+    }
+    
+    const successCount = productStore.updateProducts(updates);
+    const failedCount = products.length - successCount;
+    
+    console.log(`[Detail Scraper] ✅ Completed: ${successCount} updated, ${failedCount} failed`);
+    
+    return { success: successCount, failed: failedCount };
+  } catch (error: any) {
+    console.error('[Detail Scraper] Error:', error);
+    throw error;
+  }
+};

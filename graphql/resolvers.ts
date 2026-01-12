@@ -1,6 +1,6 @@
 // Database imports commented out
 // import { prisma } from '@/lib/prisma';
-import { startScrapingJob } from '@/services/scraperService';
+import { startScrapingJob, scrapeSelectedProductDetails } from '@/services/scraperService';
 import { brandStore, Brand } from '@/lib/brandStore';
 import { productStore } from '@/lib/productStore';
 
@@ -11,11 +11,12 @@ export const resolvers = {
         search,
         brandId,
         type,
+        gender,
         page = 1,
         pageSize = 20,
       } = filters || {};
 
-      console.log('[GraphQL] Products query called with filters:', { search, brandId, type, page, pageSize });
+      console.log('[GraphQL] Products query called with filters:', { search, brandId, type, gender, page, pageSize });
       
       // Debug: Check store state
       const totalProductCount = productStore.getProductCount();
@@ -30,6 +31,7 @@ export const resolvers = {
       const { products: storedProducts, totalCount } = productStore.getAllProducts({
         brandId,
         type,
+        gender,
         search,
         page,
         pageSize,
@@ -48,11 +50,13 @@ export const resolvers = {
             name: brand.name,
           } : null,
           type: p.type,
+          gender: p.gender,
           price: p.price,
           imageUrl: p.imageUrl,
           description: p.description,
           url: p.url,
           metadata: p.metadata,
+          details: p.details || null,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
         };
@@ -81,11 +85,13 @@ export const resolvers = {
           name: brand.name,
         } : null,
         type: storedProduct.type,
+        gender: storedProduct.gender,
         price: storedProduct.price,
         imageUrl: storedProduct.imageUrl,
         description: storedProduct.description,
         url: storedProduct.url,
         metadata: storedProduct.metadata,
+        details: storedProduct.details || null,
         createdAt: storedProduct.createdAt.toISOString(),
         updatedAt: storedProduct.updatedAt.toISOString(),
       };
@@ -210,6 +216,20 @@ export const resolvers = {
       //   data: { status: 'cancelled' },
       // });
       return true;
+    },
+
+    scrapeProductDetails: async (_: any, { input }: { input: { productIds: string[] } }) => {
+      // Wait for detail scraping to complete
+      try {
+        const result = await scrapeSelectedProductDetails(input.productIds, (progress: { current: number; total: number; productName: string }) => {
+          console.log(`[GraphQL] Detail scraping progress: ${progress.current}/${progress.total} - ${progress.productName}`);
+        });
+        
+        return result;
+      } catch (error: any) {
+        console.error('[GraphQL] Detail scraping failed:', error);
+        throw error;
+      }
     },
   },
 

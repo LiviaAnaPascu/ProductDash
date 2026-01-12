@@ -18,7 +18,7 @@ class BrandStore {
     // Initialize with Morellato brand
     this.addBrand({
       name: 'Morellato',
-      website: 'https://www.morellato.com/catalogo-prodotti-A1.htm',
+      website: 'https://www.morellato.com/donna-G2.htm',
       baseUrl: 'https://www.morellato.com',
       isActive: true,
     });

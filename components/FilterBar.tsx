@@ -1,22 +1,30 @@
 'use client';
 
+
 interface FilterBarProps {
   brands: string[];
   types: string[];
+  genders: string[];
   selectedBrand: string;
+  selectedGenders: string;
   selectedType: string;
   onBrandChange: (brand: string) => void;
   onTypeChange: (type: string) => void;
+  onGenderChange: (gender: string) => void;
 }
 
 export default function FilterBar({
   brands,
   types,
+  genders,
   selectedBrand,
+  selectedGenders,
   selectedType,
   onBrandChange,
   onTypeChange,
+  onGenderChange,
 }: FilterBarProps) {
+  console.log('[FilterBar] Genders:', genders);
   return (
     <div className="flex gap-4 flex-wrap">
       <div className="flex-1 min-w-[200px]">
@@ -33,6 +41,23 @@ export default function FilterBar({
               {brand}
             </option>
           ))}
+        </select>
+      </div><div className="flex-1 min-w-[200px]">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+        <select
+          value={selectedGenders}
+          onChange={(e) => onGenderChange(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          suppressHydrationWarning
+        >
+          <option value="">All Genders</option>
+          {genders && genders.length > 0 ? genders.map((gender) => (
+            <option key={gender} value={gender}>
+              {gender === 'male' ? 'Male' : 'Female'}
+            </option>
+          )) : (
+            <option value="" disabled>No genders available</option>
+          )}
         </select>
       </div>
       <div className="flex-1 min-w-[200px]">

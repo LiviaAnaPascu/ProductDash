@@ -48,6 +48,7 @@ class ProductStore {
   getAllProducts(filters?: {
     brandId?: string;
     type?: string;
+    gender?: string;
     search?: string;
     page?: number;
     pageSize?: number;
@@ -61,6 +62,10 @@ class ProductStore {
 
     if (filters?.type) {
       filtered = filtered.filter(p => p.type === filters.type);
+    }
+
+    if (filters?.gender) {
+      filtered = filtered.filter(p => p.gender === filters.gender);
     }
 
     if (filters?.search) {
@@ -125,6 +130,30 @@ class ProductStore {
       return this.brandProducts.get(brandId)?.size || 0;
     }
     return this.products.size;
+  }
+
+  updateProduct(id: string, updates: Partial<Product>): StoredProduct | null {
+    const product = this.products.get(id);
+    if (!product) return null;
+
+    const updatedProduct: StoredProduct = {
+      ...product,
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    this.products.set(id, updatedProduct);
+    return updatedProduct;
+  }
+
+  updateProducts(updates: Map<string, Partial<Product>>): number {
+    let count = 0;
+    for (const [id, updateData] of updates.entries()) {
+      if (this.updateProduct(id, updateData)) {
+        count++;
+      }
+    }
+    return count;
   }
 }
 

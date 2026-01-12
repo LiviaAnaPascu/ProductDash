@@ -14,7 +14,7 @@ const morelattoScraper = async (url: string) => {
 export const brandConfigs: BrandConfig[] = [
   {
     name: 'Example Brand',
-    website: 'https://www.morellato.com/catalogo-prodotti-A1.htm',
+    website: 'https://www.morellato.com/donna-G2.htm',
     scraper: genericScraper,
   },
   // Add more brands here:

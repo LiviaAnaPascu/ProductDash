@@ -19,11 +19,13 @@ interface GraphQLProduct {
     name: string;
   };
   type: string | null;
+  gender: string;
   price: string | null;
   imageUrl: string;
   description: string | null;
   url: string;
   metadata: any;
+  details?: any; // Product details from second-layer scraping
 }
 
 export default function Dashboard() {
@@ -33,6 +35,7 @@ export default function Dashboard() {
     search: '',
     brandId: '',
     type: '',
+    gender: '',
     page: 1,
     pageSize: 50,
   });
@@ -99,7 +102,7 @@ export default function Dashboard() {
     if (productsData !== undefined && brandsData !== undefined) {
       checkAndStartScraping();
     }
-  }, [productsData?.products?.totalCount, brandsData?.brands, startScraping, refetchProducts]);
+  }, [productsData?.products?.totalCount, brandsData, startScraping, refetchProducts, productsData]);
 
   // Transform GraphQL products to match Product type
   const currentPageProducts: Product[] = useMemo(() => {
@@ -110,11 +113,13 @@ export default function Dashboard() {
       name: p.name,
       brand: p.brand.name,
       type: p.type || 'General',
+      gender: (p.gender as 'male' | 'female') || 'female', // Default to female if not provided
       price: p.price || undefined,
       imageUrl: p.imageUrl,
       description: p.description || undefined,
       url: p.url,
       metadata: p.metadata,
+      details: p.details, // Include details if available
     }));
   }, [productsData]);
 
@@ -173,12 +178,11 @@ export default function Dashboard() {
     }
   }, [allLoadedProducts, isLoadingMore]);
 
-  // Reset accumulated products when filters change
   useEffect(() => {
     if (filters.page === 1) {
       setAllLoadedProducts([]);
     }
-  }, [filters.search, filters.brandId, filters.type]);
+  }, [filters.search, filters.brandId, filters.type, filters.gender, filters.page]);
 
   // Handle load more - prevent multiple simultaneous loads
   const handleLoadMore = () => {
@@ -199,6 +203,11 @@ export default function Dashboard() {
   const types = useMemo(() => {
     const uniqueTypes = new Set(products.map((p) => p.type));
     return Array.from(uniqueTypes).sort();
+  }, [products]);
+
+  const genders = useMemo(() => {
+    const uniqueGenders = new Set(products.map((p) => p.gender).filter(Boolean));
+    return Array.from(uniqueGenders).sort();
   }, [products]);
 
   // Get selected product objects
@@ -241,15 +250,22 @@ export default function Dashboard() {
                 onChange={(value) => setFilters({ ...filters, search: value, page: 1 })}
               />
             </div>
-            <ExportButton selectedProducts={selectedProductObjects} />
+            <ExportButton 
+              selectedProducts={selectedProductObjects} 
+              selectedProductIds={Array.from(selectedProducts)}
+              onProductsUpdate={() => refetchProducts()}
+            />
           </div>
           <FilterBar
             brands={brands}
             types={types}
+            genders={genders}
             selectedBrand={brandsData?.brands?.find((b: any) => b.id === filters.brandId)?.name || ''}
             selectedType={filters.type}
+            selectedGenders={filters.gender}
             onBrandChange={handleBrandChange}
             onTypeChange={(type) => setFilters({ ...filters, type, page: 1 })}
+            onGenderChange={(gender) => setFilters({ ...filters, gender, page: 1 })}
           />
         </div>
 
