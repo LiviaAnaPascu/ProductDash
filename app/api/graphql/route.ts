@@ -14,9 +14,10 @@ import '@/lib/brandStore';
 // Import auto-scraper to start scraping automatically
 import { startAutoScraping } from '@/lib/autoScraper';
 
-// Start auto-scraping on module load (only runs once)
+// Initialize queue workers
 if (typeof window === 'undefined') {
   // Only run on server side
+  require('@/lib/initWorkers');
   startAutoScraping().catch(console.error);
 }
 

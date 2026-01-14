@@ -109,6 +109,28 @@ export const typeDefs = gql`
     failed: Int!
   }
 
+  type Job {
+    id: ID!
+    type: String!
+    status: String!
+    progress: Int
+    data: JSON
+    error: String
+    createdAt: String!
+    updatedAt: String!
+    completedAt: String
+  }
+
+  input ExportCSVInput {
+    productIds: [ID!]!
+    filename: String
+  }
+
+  type ExportCSVResult {
+    jobId: ID!
+    status: String!
+  }
+
   type Query {
     products(filters: ProductFilters): ProductConnection!
     product(id: ID!): Product
@@ -116,6 +138,8 @@ export const typeDefs = gql`
     brand(id: ID!): Brand
     scraperJobs(brandId: ID): [ScraperJob!]!
     scraperJob(id: ID!): ScraperJob
+    job(id: ID!): Job
+    jobs(type: String): [Job!]!
     debugStore: StoreDebug!
   }
 
@@ -137,7 +161,8 @@ export const typeDefs = gql`
     deleteBrand(id: ID!): Boolean!
     startScraping(input: StartScrapingInput!): ScraperJob!
     cancelScraping(jobId: ID!): Boolean!
-    scrapeProductDetails(input: ScrapeProductDetailsInput!): ScrapeProductDetailsResult!
+    scrapeProductDetails(input: ScrapeProductDetailsInput!): Job!
+    exportCSV(input: ExportCSVInput!): ExportCSVResult!
   }
 
   type Subscription {

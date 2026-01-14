@@ -1,8 +1,17 @@
 // Database imports commented out
 // import { prisma } from '@/lib/prisma';
-import { startScrapingJob, scrapeSelectedProductDetails } from '@/services/scraperService';
 import { brandStore, Brand } from '@/lib/brandStore';
 import { productStore } from '@/lib/productStore';
+import { 
+  scrapeBrandQueue, 
+  scrapeProductDetailsQueue, 
+  exportCSVQueue,
+  JobType,
+  ScrapeBrandJobData,
+  ScrapeProductDetailsJobData,
+  ExportCSVJobData,
+} from '@/lib/queue';
+import { jobStore } from '@/lib/jobStore';
 
 export const resolvers = {
   Query: {
@@ -127,6 +136,48 @@ export const resolvers = {
       return null;
     },
 
+    job: async (_: any, { id }: { id: string }) => {
+      const job = jobStore.getJob(id);
+      
+      // Debug logging
+      if (!job) {
+        console.log(`[GraphQL] Job ${id} not found in store`);
+        const allJobs = jobStore.getAllJobs();
+        console.log(`[GraphQL] Available jobs:`, allJobs.map(j => ({ id: j.id, status: j.status })));
+        return null;
+      }
+      
+      console.log(`[GraphQL] Job ${id} status: ${job.status}, progress: ${job.progress}`);
+      
+      return {
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        progress: job.progress || null,
+        data: job.data || null,
+        error: job.error || null,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+        completedAt: job.completedAt?.toISOString() || null,
+      };
+    },
+
+    jobs: async (_: any, { type }: { type?: string }) => {
+      const jobs = jobStore.getAllJobs(type as JobType | undefined);
+      
+      return jobs.map(job => ({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        progress: job.progress || null,
+        data: job.data || null,
+        error: job.error || null,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+        completedAt: job.completedAt?.toISOString() || null,
+      }));
+    },
+
     debugStore: async () => {
       // Debug endpoint to check store state
       const brands = brandStore.getAllBrands();
@@ -189,9 +240,35 @@ export const resolvers = {
         throw new Error('Brand not found');
       }
 
-      // Create mock scraper job (without database)
-      const job = {
-        id: `job-${Date.now()}`,
+      // Create job ID
+      const jobId = `scrape-${brand.id}-${Date.now()}`;
+      
+      // Create job in store
+      const job = jobStore.createJob(jobId, JobType.SCRAPE_BRAND, {
+        brandId: brand.id,
+        brandName: brand.name,
+      });
+
+      // Enqueue scraping job
+      const jobData: ScrapeBrandJobData = {
+        jobId,
+        brandId: brand.id,
+        brandName: brand.name,
+        website: brand.website,
+      };
+
+      await scrapeBrandQueue.add(jobId, jobData, {
+        jobId, // Use custom job ID
+        attempts: 3, // Retry up to 3 times on failure
+        backoff: {
+          type: 'exponential',
+          delay: 2000, // Start with 2 second delay
+        },
+      });
+
+      // Return mock scraper job format for backward compatibility
+      return {
+        id: jobId,
         brandId: input.brandId,
         status: 'pending',
         brand,
@@ -200,13 +277,6 @@ export const resolvers = {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-
-      // Start scraping asynchronously
-      startScrapingJob(job.id, brand).catch((error) => {
-        console.error('Scraping job failed:', error);
-      });
-
-      return job;
     },
 
     cancelScraping: async (_: any, { jobId }: { jobId: string }) => {
@@ -219,17 +289,108 @@ export const resolvers = {
     },
 
     scrapeProductDetails: async (_: any, { input }: { input: { productIds: string[] } }) => {
-      // Wait for detail scraping to complete
-      try {
-        const result = await scrapeSelectedProductDetails(input.productIds, (progress: { current: number; total: number; productName: string }) => {
-          console.log(`[GraphQL] Detail scraping progress: ${progress.current}/${progress.total} - ${progress.productName}`);
-        });
-        
-        return result;
-      } catch (error: any) {
-        console.error('[GraphQL] Detail scraping failed:', error);
-        throw error;
+      if (input.productIds.length === 0) {
+        throw new Error('No product IDs provided');
       }
+
+      // Try to find at least one product to get brand ID
+      // Try all product IDs until we find one that exists
+      let foundProduct = null;
+      let brandId: string | null = null;
+      
+      for (const productId of input.productIds) {
+        const product = productStore.getProduct(productId);
+        if (product) {
+          foundProduct = product;
+          brandId = product.brandId;
+          break;
+        }
+      }
+
+      // If no products found, provide helpful error
+      if (!foundProduct || !brandId) {
+        const availableProductIds = productStore.getAllProducts({ page: 1, pageSize: 10 }).products.map(p => p.id);
+        throw new Error(
+          `Product not found. Requested IDs: ${input.productIds.slice(0, 3).join(', ')}${input.productIds.length > 3 ? '...' : ''}. ` +
+          `Available products in store: ${productStore.getProductCount()}. ` +
+          `First few available IDs: ${availableProductIds.slice(0, 3).join(', ')}`
+        );
+      }
+
+      const jobId = `details-${brandId}-${Date.now()}`;
+
+      // Create job in store
+      const job = jobStore.createJob(jobId, JobType.SCRAPE_PRODUCT_DETAILS, {
+        productIds: input.productIds,
+        brandId,
+      });
+
+      // Enqueue detail scraping job
+      const jobData: ScrapeProductDetailsJobData = {
+        jobId,
+        productIds: input.productIds,
+        brandId,
+      };
+
+      await scrapeProductDetailsQueue.add(jobId, jobData, {
+        jobId,
+        attempts: 2,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+      });
+
+      // Return job instead of waiting for completion
+      return {
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        progress: job.progress || null,
+        data: job.data || null,
+        error: job.error || null,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+        completedAt: job.completedAt?.toISOString() || null,
+      };
+    },
+
+    exportCSV: async (_: any, { input }: { input: { productIds: string[]; filename?: string } }) => {
+      if (input.productIds.length === 0) {
+        throw new Error('No product IDs provided');
+      }
+
+      const jobId = `export-${Date.now()}`;
+      console.log(`[GraphQL] Creating export job: ${jobId}`);
+
+      // Create job in store
+      const job = jobStore.createJob(jobId, JobType.EXPORT_CSV, {
+        productIds: input.productIds,
+        filename: input.filename,
+      });
+      console.log(`[GraphQL] Job created in store: ${job.id}, status: ${job.status}`);
+
+      // Enqueue export job
+      const jobData: ExportCSVJobData = {
+        jobId,
+        productIds: input.productIds,
+        filename: input.filename,
+      };
+
+      await exportCSVQueue.add(jobId, jobData, {
+        jobId, // Use the same jobId
+        attempts: 1, // Export jobs typically don't need retries
+      });
+      console.log(`[GraphQL] Job ${jobId} added to queue`);
+
+      // Verify job is in store
+      const verifyJob = jobStore.getJob(jobId);
+      console.log(`[GraphQL] Verified job in store: ${verifyJob?.id}, status: ${verifyJob?.status}`);
+
+      return {
+        jobId: job.id,
+        status: job.status,
+      };
     },
   },
 
