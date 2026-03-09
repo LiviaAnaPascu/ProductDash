@@ -1,5 +1,3 @@
-// Database imports commented out
-// import { prisma } from '@/lib/prisma';
 import { brandStore, Brand } from '@/lib/brandStore';
 import { productStore } from '@/lib/productStore';
 import { 
@@ -117,22 +115,10 @@ export const resolvers = {
     },
 
     scraperJobs: async (_: any, { brandId }: { brandId?: string }) => {
-      // Database operations commented out
-      // const where = brandId ? { brandId } : {};
-      // return prisma.scraperJob.findMany({
-      //   where,
-      //   include: { brand: true },
-      //   orderBy: { createdAt: 'desc' },
-      // });
       return [];
     },
 
     scraperJob: async (_: any, { id }: { id: string }) => {
-      // Database operations commented out
-      // return prisma.scraperJob.findUnique({
-      //   where: { id },
-      //   include: { brand: true },
-      // });
       return null;
     },
 
@@ -280,11 +266,6 @@ export const resolvers = {
     },
 
     cancelScraping: async (_: any, { jobId }: { jobId: string }) => {
-      // Database operations commented out
-      // await prisma.scraperJob.update({
-      //   where: { id: jobId },
-      //   data: { status: 'cancelled' },
-      // });
       return true;
     },
 

@@ -1,7 +1,5 @@
 import * as cheerio from 'cheerio';
 import { Product } from '@/types/product';
-// Database imports commented out
-// import { Brand } from '@prisma/client';
 import { ScrapingProgress } from '@/services/scraperService';
 import { Brand } from '@/lib/brandStore';
 

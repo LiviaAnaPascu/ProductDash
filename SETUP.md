@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Node.js 18+ 
-- PostgreSQL (or SQLite for development)
+- Node.js 18+
+- Redis (for BullMQ job queue)
 - npm or yarn
 
 ## Installation
@@ -13,46 +13,19 @@
 npm install
 ```
 
-2. Set up environment variables:
+2. Ensure Redis is running:
 ```bash
-cp .env.example .env
-# Edit .env and add your DATABASE_URL
+brew services start redis
 ```
 
-3. Set up the database:
-```bash
-# Generate Prisma Client
-npm run db:generate
-
-# Run migrations
-npm run db:migrate
-
-# (Optional) Seed the database
-npm run db:seed
-```
-
-4. Run the development server:
+3. Run the development server:
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Database Configuration
-
-### PostgreSQL (Recommended for Production)
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/productdash?schema=public"
-```
-
-### SQLite (Development)
-```env
-DATABASE_URL="file:./dev.db"
-```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Adding New Brands
-
-To add a new brand to the system:
 
 ### Option 1: Using GraphQL API
 
@@ -69,20 +42,9 @@ mutation {
 }
 ```
 
-### Option 2: Using Prisma directly
+### Option 2: Edit `lib/brandStore.ts`
 
-```typescript
-import { prisma } from '@/lib/prisma';
-
-await prisma.brand.create({
-  data: {
-    name: 'Your Brand Name',
-    website: 'https://your-brand-website.com/products',
-    baseUrl: 'https://your-brand-website.com',
-    isActive: true,
-  },
-});
-```
+Add brands directly in the `BrandStore` constructor.
 
 ### Creating Custom Scrapers
 
@@ -110,7 +72,7 @@ export const yourBrandScraperConfig: ScraperConfig = {
     type: '.category',
   },
   baseUrl: 'https://your-brand-website.com',
-  
+
   // Optional: Custom extraction function
   extractProduct: ($, element) => {
     // Custom logic here
@@ -121,7 +83,12 @@ export const yourBrandScraperConfig: ScraperConfig = {
 registerBrandScraper('Your Brand Name', yourBrandScraperConfig);
 ```
 
-3. Import the scraper in your app initialization (e.g., `app/layout.tsx` or a startup file)
+3. Import the scraper in `app/api/graphql/route.ts`:
+
+```typescript
+import '@/utils/morellatoScraper';
+import '@/utils/yourBrandScraper'; // Add this
+```
 
 ## Starting Scraping Jobs
 
@@ -197,12 +164,18 @@ ProductDash/
 ├── hooks/                 # Custom React hooks
 │   └── useWebSocket.ts   # WebSocket hook
 ├── lib/                   # Library utilities
-│   ├── prisma.ts         # Prisma client
+│   ├── brandStore.ts     # In-memory brand store
+│   ├── productStore.ts   # In-memory product store
+│   ├── jobStore.ts       # In-memory job store
+│   ├── queue.ts          # BullMQ queue setup
 │   ├── apollo-client.ts  # Apollo Client setup
-│   └── websocket-client.ts # WebSocket client
-├── prisma/                # Prisma configuration
-│   ├── schema.prisma     # Database schema
-│   └── seed.ts           # Database seeding
+│   ├── autoScraper.ts    # Auto-scraping on startup
+│   └── initWorkers.ts    # Worker initialization
+├── workers/               # BullMQ workers
+│   ├── index.ts          # Worker loader
+│   ├── scrapeBrandWorker.ts
+│   ├── scrapeProductDetailsWorker.ts
+│   └── exportCSVWorker.ts
 ├── services/              # Business logic
 │   └── scraperService.ts # Scraping job management
 ├── server/                # Server-side utilities
@@ -212,7 +185,6 @@ ProductDash/
 └── utils/                 # Utility functions
     ├── advancedScraper.ts # Advanced scraping with pagination
     ├── morellatoScraper.ts # Brand-specific scraper example
-    ├── brandConfigs.ts   # Brand configurations (legacy)
     ├── csvExport.ts     # CSV export utility
     └── productScraper.ts # Basic product scraping utilities
 ```
@@ -240,4 +212,3 @@ Update the `Product` interface in `types/product.ts` to add new fields.
 
 ### Export Format
 Modify `utils/csvExport.ts` to change CSV export columns or format.
-

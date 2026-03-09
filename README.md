@@ -5,8 +5,8 @@ A modern Next.js dashboard application for managing and exporting product catalo
 ## Features
 
 - **GraphQL API** with Apollo Server for flexible data queries
-- **Prisma ORM** for type-safe database access
 - **Advanced Scraping System** with pagination and promise chaining
+- **Background Job Processing** with BullMQ and Redis
 - **Product Management** with search, filters, and CSV export
 - **Scraping Job Tracking** with progress monitoring
 - **Scalable Architecture** for adding new brands easily
@@ -20,10 +20,8 @@ See [QUICKSTART.md](./QUICKSTART.md) for detailed setup instructions.
 # Install dependencies
 npm install
 
-# Set up database (configure DATABASE_URL in .env)
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+# Ensure Redis is running
+brew services start redis
 
 # Start development server
 npm run dev
@@ -40,15 +38,16 @@ npm run dev
 
 ### Backend
 - GraphQL (Apollo Server)
-- Prisma ORM
-- PostgreSQL / SQLite
+- In-memory stores (brandStore, productStore, jobStore)
+- BullMQ + Redis (background job processing)
 - Cheerio (web scraping)
 - PapaParse (CSV export)
 
 ## Architecture
 
-- **Database**: Prisma ORM with PostgreSQL/SQLite
+- **Data Storage**: In-memory singleton stores for brands, products, and jobs
 - **API**: GraphQL with Apollo Server
+- **Job Queue**: BullMQ workers for scraping and CSV export
 - **Scraping**: Advanced scraper with pagination support
 - **Frontend**: React with Apollo Client
 
@@ -59,4 +58,3 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation
 - [QUICKSTART.md](./QUICKSTART.md) - Quick setup guide
 - [SETUP.md](./SETUP.md) - Detailed setup and configuration
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Architecture overview
-

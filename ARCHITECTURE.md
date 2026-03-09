@@ -2,31 +2,24 @@
 
 ## Backend Structure
 
-### In-Memory Stores (Default)
-The application uses **in-memory stores** by default for fast development and testing:
+### In-Memory Stores
+The application uses **in-memory stores** for data management:
 
 - **Brand Store** (`lib/brandStore.ts`): Manages brands in memory
 - **Product Store** (`lib/productStore.ts`): Manages scraped products in memory
+- **Job Store** (`lib/jobStore.ts`): Tracks background job status
 - **Auto-Initialization**: Morellato brand is automatically added on server start
 - **Auto-Scraping**: Automatically starts scraping for brands with no products (development mode)
 
-### Database (Prisma ORM) - Optional
-Database support is available but commented out by default:
-
-- **Brand**: Stores brand information and configuration
-- **Product**: Stores product data with relationships to brands
-- **ScraperJob**: Tracks scraping jobs with progress and status
-
-To enable database, uncomment the Prisma code in:
-- `prisma/schema.prisma`
-- `lib/prisma.ts`
-- `graphql/resolvers.ts`
-- `services/scraperService.ts`
-
 ### GraphQL API
 - **Apollo Server v5**: Handles all GraphQL queries and mutations
-- **Resolvers**: Business logic for fetching and manipulating data (uses in-memory stores)
+- **Resolvers**: Business logic for fetching and manipulating data (reads/writes in-memory stores)
 - **Schema**: Type definitions for all entities
+
+### Job Queue (BullMQ + Redis)
+- **Queues**: `scrape-brand`, `scrape-product-details`, `export-csv`
+- **Workers**: Process jobs asynchronously in the background
+- **Job Store**: Tracks job status (pending, active, completed, failed)
 
 ### Scraping System
 - **Advanced Scraper**: Handles pagination, promise chaining, and product extraction
@@ -126,24 +119,6 @@ mutation {
 }
 ```
 
-## Database Setup
-
-1. Set up your database (PostgreSQL recommended):
-```bash
-# Create .env file with DATABASE_URL
-DATABASE_URL="postgresql://user:password@localhost:5432/productdash?schema=public"
-```
-
-2. Run migrations:
-```bash
-npm run db:migrate
-```
-
-3. Seed database (optional):
-```bash
-npm run db:seed
-```
-
 ## GraphQL Queries
 
 ### Get Products with Filters
@@ -197,9 +172,6 @@ query {
 
 ```
 ProductDash/
-├── prisma/
-│   ├── schema.prisma      # Database schema
-│   └── seed.ts            # Database seeding
 ├── graphql/
 │   ├── schema.ts          # GraphQL type definitions
 │   ├── resolvers.ts       # GraphQL resolvers
@@ -212,19 +184,25 @@ ProductDash/
 ├── lib/
 │   ├── brandStore.ts      # In-memory brand store
 │   ├── productStore.ts    # In-memory product store
-│   ├── autoScraper.ts    # Auto-scraping on server start
-│   ├── prisma.ts          # Prisma client (commented out)
+│   ├── jobStore.ts        # In-memory job store
+│   ├── queue.ts           # BullMQ queue setup
+│   ├── autoScraper.ts     # Auto-scraping on server start
+│   ├── initWorkers.ts     # Worker initialization
 │   └── apollo-client.ts   # Apollo Client setup
+├── workers/
+│   ├── index.ts           # Worker loader
+│   ├── scrapeBrandWorker.ts
+│   ├── scrapeProductDetailsWorker.ts
+│   └── exportCSVWorker.ts
 ├── components/
-│   ├── VirtualizedProductGrid.tsx # Virtualized grid with lazy loading
-│   ├── BackToTopButton.tsx       # Back to top functionality
-│   ├── ProductCard.tsx            # Individual product card
-│   ├── SearchBar.tsx              # Search input
-│   ├── FilterBar.tsx              # Brand/type filters
-│   └── ExportButton.tsx          # CSV export
+│   ├── VirtualizedProductGrid.tsx
+│   ├── BackToTopButton.tsx
+│   ├── ProductCard.tsx
+│   ├── SearchBar.tsx
+│   ├── FilterBar.tsx
+│   └── ExportButton.tsx
 └── app/
     ├── api/
     │   └── graphql/        # GraphQL API endpoint (Apollo Server v5)
     └── page.tsx            # Dashboard with infinite scroll
 ```
-

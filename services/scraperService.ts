@@ -1,6 +1,3 @@
-// Database imports commented out
-// import { Brand } from '@prisma/client';
-// import { prisma } from '@/lib/prisma';
 import { scrapeBrandProducts, scrapeProductDetails, getScraperConfig } from '@/utils/advancedScraper';
 import { Brand } from '@/lib/brandStore';
 import { productStore, StoredProduct } from '@/lib/productStore';
@@ -17,30 +14,9 @@ export interface ScrapingProgress {
 
 export const startScrapingJob = async (jobId: string, brand: Brand) => {
   try {
-    // Database operations commented out
-    // Update job status to running
-    // await prisma.scraperJob.update({
-    //   where: { id: jobId },
-    //   data: {
-    //     status: 'running',
-    //     startedAt: new Date(),
-    //   },
-    // });
     console.log(`[${jobId}] Scraping job started for brand: ${brand.name}`);
 
-    // Start scraping with progress callback
     const progressCallback = async (progress: ScrapingProgress) => {
-      // Database operations commented out
-      // await prisma.scraperJob.update({
-      //   where: { id: jobId },
-      //   data: {
-      //     currentPage: progress.currentPage,
-      //     totalPages: progress.totalPages,
-      //     productsFound: progress.productsFound,
-      //     status: progress.status,
-      //     error: progress.error,
-      //   },
-      // });
       console.log(`[${jobId}] Progress: Page ${progress.currentPage}/${progress.totalPages}, Products: ${progress.productsFound}`);
     };
 
@@ -61,28 +37,8 @@ export const startScrapingJob = async (jobId: string, brand: Brand) => {
     const verifyCount = productStore.getProductCount(brand.id);
     console.log(`[${jobId}] ✅ Verified: ${verifyCount} products now in store for brand ${brand.name}`);
 
-    // Database operations commented out
-    // Mark job as completed
-    // await prisma.scraperJob.update({
-    //   where: { id: jobId },
-    //   data: {
-    //     status: 'completed',
-    //     completedAt: new Date(),
-    //     productsFound: products.length,
-    //   },
-    // });
     console.log(`[${jobId}] Scraping job completed`);
   } catch (error: any) {
-    console.error('Scraping job error:', error);
-    // Database operations commented out
-    // await prisma.scraperJob.update({
-    //   where: { id: jobId },
-    //   data: {
-    //     status: 'failed',
-    //     error: error.message,
-    //     completedAt: new Date(),
-    //   },
-    // });
     console.error(`[${jobId}] Scraping job failed: ${error.message}`);
   }
 };
