@@ -238,20 +238,19 @@ export const morellatoScraperConfig: ScraperConfig = {
     let type = 'Jewelry'; // Default
     const nameLower = name.toLowerCase();
     
-    // Helper function to check if name includes any of the given keywords
     const includesAny = (keywords: string[]) => keywords.some(keyword => nameLower.includes(keyword));
     
-    if (includesAny(['charm'])) type = 'Charm';
-    else if (includesAny(['bracciale', 'bracelet'])) type = 'Bracelet';
-    else if (includesAny(['collana', 'necklace'])) type = 'Necklace';
-    else if (includesAny(['cavigliera', 'anklet'])) type = 'Anklet';
-    else if (includesAny(['anello', 'ring'])) type = 'Ring';
-    else if (includesAny(['orecchino', 'orecchini', 'earring', 'earings'])) type = 'Earring';
-    else if (includesAny(['orologio', 'watch'])) type = 'Watch';
-    else if (includesAny(['ciondolo', 'pendant'])) type = 'Pendant';
-    else if (includesAny(['penna', 'pen'])) type = 'Pen';
-    else if (includesAny(['spilla', 'brooch'])) type = 'Brooch';
-    else if (!includesAny(['bracciale', 'collana', 'anello', 'orecchino', 'orecchini', 'ciondolo',  'penna','spilla'])) type = 'Other';
+    if (includesAny(['charm'])) type = 'Charms';
+    else if (includesAny(['bracciale', 'bracelet'])) type = 'Bracelets';
+    else if (includesAny(['collana', 'necklace'])) type = 'Necklaces';
+    else if (includesAny(['cavigliera', 'anklet'])) type = 'Anklets';
+    else if (includesAny(['anello', 'ring'])) type = 'Rings';
+    else if (includesAny(['orecchino', 'orecchini', 'earring', 'earings'])) type = 'Earrings';
+    else if (includesAny(['orologio', 'watch'])) type = 'Watches';
+    else if (includesAny(['ciondolo', 'pendant'])) type = 'Pendants';
+    else if (includesAny(['penna', 'pen'])) type = 'Pens';
+    else if (includesAny(['spilla', 'brooch'])) type = 'Brooches';
+    else if (!includesAny(['bracciale', 'collana', 'anello', 'orecchino', 'orecchini', 'ciondolo', 'penna', 'spilla'])) type = 'Other';
 
     // Example: Skip products that don't meet certain criteria
     // Option 1: Return null to skip this product entirely
