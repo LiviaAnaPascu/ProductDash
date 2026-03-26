@@ -63,8 +63,9 @@ export default function Dashboard() {
       
       // Check if we have products
       const hasProducts = productsData?.products?.totalCount > 0;
+      console.log("prducts: " , productsData)
       const hasBrands = brandsData?.brands?.length > 0;
-      
+      console.log("brands: " , brandsData)
       if (!hasProducts && hasBrands) {
         const firstBrand = brandsData.brands[0];
         if (firstBrand && firstBrand.productCount === 0) {

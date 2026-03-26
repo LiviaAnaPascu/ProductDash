@@ -7,6 +7,7 @@ import { resolvers } from '@/graphql/resolvers';
 // Import brand scrapers to register them
 // This ensures scrapers are registered when the module loads
 import '@/utils/morellatoScraper';
+import '@/utils/sagapoWomenScraper';
 
 // Import brand store to initialize brands
 import '@/lib/brandStore';
